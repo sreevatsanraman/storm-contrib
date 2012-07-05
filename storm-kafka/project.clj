@@ -2,10 +2,11 @@
   :source-path "src/clj"
   :java-source-path "src/jvm"
   :javac-options {:debug "true" :fork "true"}
-  :repositories {"releases" "http://artifactory.local.twitter.com/libs-releases-local"
+  :repositories {"klout-snapshots" "http://maven-repo:8081/artifactory/libs-snapshot-local"
+  		 "releases" "http://artifactory.local.twitter.com/libs-releases-local"
                  "snapshots" "http://artifactory.local.twitter.com/libs-snapshots-local"
                  "artifactory" "http://artifactory.local.twitter.com/repo"}
-  :dependencies [[storm/kafka "0.7.0-incubating"
+  :dependencies [[kafka/core-kafka_2.9.1 "0.7.0-SNAPSHOT"
                    :exclusions [org.apache.zookeeper/zookeeper
                                 log4j/log4j]]]
   :dev-dependencies [[storm "0.7.2"]
