@@ -75,8 +75,8 @@ public class StatefulBoltExecutor<T extends State> implements IRichBolt {
 
     @Override
     public Map<String, Object> getComponentConfiguration() {
-        Map ret = _delegate.getComponentConfiguration();
-        if(ret==null) ret = new HashMap();
+        Map<String, Object> ret = _delegate.getComponentConfiguration();
+        if(ret==null) ret = new HashMap<String, Object>();
         Number commitFreq = (Number) ret.get(IStatefulBolt.TOPOLOGY_STATE_COMMIT_FREQ_SECS);
         if(commitFreq == null) commitFreq = 1;
         ret.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, commitFreq.intValue());
