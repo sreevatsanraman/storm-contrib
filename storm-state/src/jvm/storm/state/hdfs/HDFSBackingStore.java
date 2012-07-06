@@ -9,27 +9,19 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.serializers.DefaultSerializers.BigIntegerSerializer;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Semaphore;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.fs.*;
 import org.apache.log4j.Logger;
 import storm.state.IBackingStore;
-import storm.state.hdfs.HDFSLog.LogWriter;
 import storm.state.Serializations;
 import storm.state.State;
 import storm.state.Transaction;
+import storm.state.hdfs.HDFSLog.LogWriter;
 
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Semaphore;
 
 public class HDFSBackingStore implements IBackingStore {
     public static final Logger LOG = Logger.getLogger(HDFSBackingStore.class);
@@ -58,7 +50,8 @@ public class HDFSBackingStore implements IBackingStore {
         _isLocal = _fs instanceof RawLocalFileSystem;
         _rootDir = new Path(dfsDir).toString();        
     }
-    
+
+    @Override
     public void init(Map conf, Serializations sers) {
         Number autoCompactFrequency = (Number) conf.get(AUTO_COMPACT_BYTES_CONFIG);
         if(autoCompactFrequency == null) autoCompactFrequency = DEFAULT_AUTO_COMPACT_BYTES;
@@ -98,23 +91,28 @@ public class HDFSBackingStore implements IBackingStore {
     
     Executor _executor = null;
     
+    @Override
     public void setExecutor(Executor executor) {
         _executor = executor;
     }
     
+    @Override
     public Object appendAndApply(Transaction entry, State state) {
         _pendingTransactions.add(entry);
         return entry.apply(state);
     }
     
+    @Override
     public BigInteger getVersion() {
         return _currVersion;
     }
     
+    @Override
     public void commit(State state) {
         commit(null, state);
     }
     
+    @Override
     public void commit(BigInteger txid, State state) {
         Commit commit = new Commit(txid, _pendingTransactions);
         _snapshotBeforeLastCommit = _currSnapshot;
@@ -136,6 +134,7 @@ public class HDFSBackingStore implements IBackingStore {
         }
     }
     
+    @Override
     public void resetToLatest(State state) {
        // TODO: probably much better to serialize the snapshot directly into the output stream to prevent
         // so much more memory usage
@@ -198,11 +197,13 @@ public class HDFSBackingStore implements IBackingStore {
         
     }
     
+    @Override
     public void compact(State state) {
         long version = prepareCompact();
         doCompact(version, new Checkpoint(_currVersion, _snapshotBeforeLastCommit, _lastCommit));        
     }
     
+    @Override
     public void compactAsync(State state) {
         if(_executor==null) {
             throw new RuntimeException("Need to configure with an executor to run compactions in the background");
@@ -277,6 +278,7 @@ public class HDFSBackingStore implements IBackingStore {
         }        
     }
     
+    @Override
     public void rollback(State state) {
         if(_currVersion==null) {
             throw new RuntimeException("Cannot rollback a non-versioned state (and can't rollback twice without a commit)");
@@ -290,6 +292,7 @@ public class HDFSBackingStore implements IBackingStore {
         _currVersion = null;
     }
     
+    @Override
     public void close() {
         _openLog.close();
     }
