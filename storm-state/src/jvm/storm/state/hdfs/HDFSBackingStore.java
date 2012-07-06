@@ -23,12 +23,12 @@ import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 
-public class HDFSBackingStore implements IBackingStore {
+public class HDFSBackingStore<T extends State> implements IBackingStore<T> {
     public static final Logger LOG = Logger.getLogger(HDFSBackingStore.class);
     public static final String AUTO_COMPACT_BYTES_CONFIG = "topology.state.auto.compact.bytes";
     public static final int DEFAULT_AUTO_COMPACT_BYTES = 10 * 1024 * 1024;
         
-    List<Transaction> _pendingTransactions = new ArrayList<Transaction>();
+    List<Transaction<T>> _pendingTransactions = new ArrayList<Transaction<T>>();
     Kryo _fgSerializer;
     Kryo _bgSerializer;
     BigInteger _currVersion;
@@ -43,7 +43,7 @@ public class HDFSBackingStore implements IBackingStore {
     long _autoCompactFrequencyBytes;
     Object _snapshotBeforeLastCommit = null;
     Object _currSnapshot;
-    Commit _lastCommit = null;
+    Commit<T> _lastCommit = null;
         
     public HDFSBackingStore(String dfsDir) {
         _fs = HDFSUtils.getFS(dfsDir);
@@ -97,7 +97,7 @@ public class HDFSBackingStore implements IBackingStore {
     }
     
     @Override
-    public Object appendAndApply(Transaction entry, State state) {
+    public Object appendAndApply(Transaction<T> entry, T state) {
         _pendingTransactions.add(entry);
         return entry.apply(state);
     }
@@ -114,11 +114,11 @@ public class HDFSBackingStore implements IBackingStore {
     
     @Override
     public void commit(BigInteger txid, State state) {
-        Commit commit = new Commit(txid, _pendingTransactions);
+        Commit<T> commit = new Commit<T>(txid, _pendingTransactions);
         _snapshotBeforeLastCommit = _currSnapshot;
         _currSnapshot = state.getSnapshot();
         _lastCommit = commit;
-        _pendingTransactions = new ArrayList<Transaction>();
+        _pendingTransactions = new ArrayList<Transaction<T>>();
 
         _writtenSinceCompaction += _openLog.write(commit);
         if(_isLocal) {
@@ -135,7 +135,7 @@ public class HDFSBackingStore implements IBackingStore {
     }
     
     @Override
-    public void resetToLatest(State state) {
+    public void resetToLatest(T state) {
        // TODO: probably much better to serialize the snapshot directly into the output stream to prevent
         // so much more memory usage
         Long latestCheckpoint = latestCheckpoint();
@@ -146,11 +146,11 @@ public class HDFSBackingStore implements IBackingStore {
             _lastCommit = null;
             version = BigInteger.ZERO;
         } else {
-            Checkpoint checkpoint = readCheckpoint(_fs, latestCheckpoint, _fgSerializer);
+            Checkpoint<T> checkpoint = readCheckpoint(_fs, latestCheckpoint, _fgSerializer);
             state.setState(checkpoint.snapshot);
             _snapshotBeforeLastCommit = checkpoint.snapshot;
             _lastCommit = checkpoint.commit;
-            for(Transaction t: checkpoint.commit.transactions) {
+            for(Transaction<T> t: checkpoint.commit.transactions) {
                 t.apply(state);
             }
             _currSnapshot = state.getSnapshot();
@@ -163,12 +163,12 @@ public class HDFSBackingStore implements IBackingStore {
             if(l > latestCheckpoint) {
                 HDFSLog.LogReader r = HDFSLog.open(_fs, txlogPath(l), _fgSerializer);
                 while(true) {
-                    Commit c = (Commit) r.read();
+                    Commit<T> c = (Commit<T>) r.read();
                     if(c==null) break;
                     version = c.txid;
                     _snapshotBeforeLastCommit = state.getSnapshot();
                     _lastCommit = c;
-                    for(Transaction t: c.transactions) {
+                    for(Transaction<T> t: c.transactions) {
                         t.apply(state);
                     }
                     _currSnapshot = state.getSnapshot();
@@ -200,7 +200,7 @@ public class HDFSBackingStore implements IBackingStore {
     @Override
     public void compact(State state) {
         long version = prepareCompact();
-        doCompact(version, new Checkpoint(_currVersion, _snapshotBeforeLastCommit, _lastCommit));        
+        doCompact(version, new Checkpoint<T>(_currVersion, _snapshotBeforeLastCommit, _lastCommit));
     }
     
     @Override
@@ -209,7 +209,7 @@ public class HDFSBackingStore implements IBackingStore {
             throw new RuntimeException("Need to configure with an executor to run compactions in the background");
         }
         final long version = prepareCompact();
-        final Checkpoint checkpoint = new Checkpoint(_currVersion, _snapshotBeforeLastCommit, _lastCommit);
+        final Checkpoint<T> checkpoint = new Checkpoint<T>(_currVersion, _snapshotBeforeLastCommit, _lastCommit);
         _executor.execute(new Runnable() {
             @Override
             public void run() {
@@ -233,7 +233,7 @@ public class HDFSBackingStore implements IBackingStore {
         return snapVersion;
     }
 
-    private void doCompact(long version, Checkpoint checkpoint) {
+    private void doCompact(long version, Checkpoint<?> checkpoint) {
         try {
             writeCheckpoint(_fs, version, checkpoint, _bgSerializer);
             cleanup();
@@ -246,33 +246,33 @@ public class HDFSBackingStore implements IBackingStore {
      * A checkpoint is a snapshot + a commit to get to that transaction id. Because it stores the snapshot
      * before the commit, it can be rolled back to a prior version.
      */
-    public static class Checkpoint {
+    public static class Checkpoint<T> {
         BigInteger txid;
         Object snapshot;
-        Commit commit;
+        Commit<T> commit;
         
         //for kryo
         public Checkpoint() {
             
         }
         
-        public Checkpoint(BigInteger txid, Object snapshot, Commit commit) {
+        public Checkpoint(BigInteger txid, Object snapshot, Commit<T> commit) {
             this.txid = txid;
             this.snapshot = snapshot;
             this.commit = commit;
         }
     }
     
-    public static class Commit {
+    public static class Commit<T> {
         BigInteger txid;
-        List<Transaction> transactions;
+        List<Transaction<T>> transactions;
         
         //for kryo
         public Commit() {
             
         }
         
-        public Commit(BigInteger txid, List<Transaction> transactions) {
+        public Commit(BigInteger txid, List<Transaction<T>> transactions) {
             this.txid = txid;
             this.transactions = transactions;
         }        
@@ -354,12 +354,12 @@ public class HDFSBackingStore implements IBackingStore {
         }        
     }
     
-    private Checkpoint readCheckpoint(FileSystem fs, long version, Kryo kryo) {
+    private Checkpoint<T> readCheckpoint(FileSystem fs, long version, Kryo kryo) {
         FSDataInputStream in = null;
         try {
             in = fs.open(new Path(checkpointPath(version)));
             Input input = new Input(in);
-            Checkpoint ret = kryo.readObject(input, Checkpoint.class);
+            Checkpoint<T> ret = kryo.readObject(input, Checkpoint.class);
             input.close();
             return ret;
         } catch (IOException e) {
@@ -367,7 +367,7 @@ public class HDFSBackingStore implements IBackingStore {
         }
     }
     
-    private void writeCheckpoint(FileSystem fs, long version, Checkpoint checkpoint, Kryo kryo) {
+    private void writeCheckpoint(FileSystem fs, long version, Checkpoint<?> checkpoint, Kryo kryo) {
         try {
             String finalPath = checkpointPath(version);
             String tmpPath = tmpDir() + "/" + version + ".tmp";
