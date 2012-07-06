@@ -1,13 +1,15 @@
 package storm.state;
 
 import backtype.storm.task.TopologyContext;
+import org.json.simple.JSONValue;
+
 import java.util.HashMap;
 import java.util.Map;
-import org.json.simple.JSONValue;
 
 public class PartitionedState {
     public static State getState(Map conf, TopologyContext context, IPartitionedBackingStore store, StateFactory factory, Serializations sers) {
         int numTasks = context.getComponentTasks(context.getThisComponentId()).size();
+        store.init();
         String metajson = store.getMeta();
         if(metajson!=null) {
             Map meta = (Map) JSONValue.parse(metajson);
