@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 
 public interface IBackingStore<T extends State> {
-    void init(Map conf, Serializations sers);
+    void init(Map<String, Object> conf, Serializations sers);
     Object appendAndApply(Transaction<T> transaction, T state);
     void commit(T state);
     void commit(BigInteger txid, T state);

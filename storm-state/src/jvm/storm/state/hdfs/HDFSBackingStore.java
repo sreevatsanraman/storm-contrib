@@ -52,7 +52,7 @@ public class HDFSBackingStore<T extends State> implements IBackingStore<T> {
     }
 
     @Override
-    public void init(Map conf, Serializations sers) {
+    public void init(Map<String, Object> conf, Serializations sers) {
         Number autoCompactFrequency = (Number) conf.get(AUTO_COMPACT_BYTES_CONFIG);
         if(autoCompactFrequency == null) autoCompactFrequency = DEFAULT_AUTO_COMPACT_BYTES;
         _autoCompactFrequencyBytes = autoCompactFrequency.longValue();
