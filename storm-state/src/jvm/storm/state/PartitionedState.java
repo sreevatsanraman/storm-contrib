@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PartitionedState {
-    public static State getState(Map conf, TopologyContext context, IPartitionedBackingStore store, StateFactory factory, Serializations sers) {
+    public static <T extends State> T getState(Map conf, TopologyContext context, IPartitionedBackingStore store, StateFactory<T> factory, Serializations sers) {
         int numTasks = context.getComponentTasks(context.getThisComponentId()).size();
         store.init();
         String metajson = store.getMeta();
@@ -24,7 +24,7 @@ public class PartitionedState {
         }
         IBackingStore backingStore = store.getBackingStore(context.getThisTaskIndex());
         backingStore.setExecutor(context.getSharedExecutor());
-        State state = factory.makeState(conf, backingStore, sers);
+        T state = factory.makeState(conf, backingStore, sers);
         return state;
     }    
 }

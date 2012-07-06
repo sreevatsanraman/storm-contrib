@@ -3,19 +3,15 @@ package storm.state;
 import clojure.lang.IPersistentMap;
 import clojure.lang.MapEntry;
 import clojure.lang.PersistentHashMap;
+
 import java.math.BigInteger;
-import java.util.AbstractMap;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.*;
 
 
 public class MapState<K, V> extends AbstractMap<K, V> implements State {    
-    public static class Factory implements StateFactory {         
+    public static class Factory implements StateFactory<MapState> {
         @Override
-        public State makeState(Map conf, IBackingStore store, Serializations sers) {
+        public MapState makeState(Map conf, IBackingStore store, Serializations sers) {
             return new MapState(conf, store, sers);
         }        
     }  

@@ -12,14 +12,14 @@ import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Tuple;
 import backtype.storm.tuple.Values;
 import backtype.storm.utils.Utils;
-import java.util.Map;
-import java.util.Random;
 import storm.state.MapState;
-import storm.state.State;
 import storm.state.StateFactory;
 import storm.state.bolt.BaseStatefulBolt;
 import storm.state.bolt.StatefulBoltExecutor;
 import storm.state.hdfs.HDFSStore;
+
+import java.util.Map;
+import java.util.Random;
 
 public class MapExample {
     
@@ -102,7 +102,7 @@ public class MapExample {
         }
 
         @Override
-        public StateFactory getStateBuilder() {
+        public StateFactory<MapState> getStateBuilder() {
             return new MapState.Factory();
         }
     }

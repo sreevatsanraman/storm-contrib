@@ -8,25 +8,26 @@ import backtype.storm.topology.BasicOutputCollector;
 import backtype.storm.topology.IRichBolt;
 import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.tuple.Tuple;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import storm.state.IPartitionedBackingStore;
 import storm.state.PartitionedState;
 import storm.state.State;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-public class StatefulBoltExecutor implements IRichBolt {
-    IStatefulBolt _delegate;
-    State _state;
+
+public class StatefulBoltExecutor<T extends State> implements IRichBolt {
+    IStatefulBolt<T> _delegate;
+    T _state;
     transient BasicOutputCollector _collector;
     OutputCollector _rootCollector;
     Boolean _immediateAck;
     List<Tuple> _pendingAcks = new ArrayList<Tuple>();
     IPartitionedBackingStore _store;
     
-    public StatefulBoltExecutor(IStatefulBolt delegate, IPartitionedBackingStore store) {
+    public StatefulBoltExecutor(IStatefulBolt<T> delegate, IPartitionedBackingStore store) {
         _delegate = delegate;
         _store = store;
     }
