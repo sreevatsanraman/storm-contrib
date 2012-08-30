@@ -6,11 +6,13 @@ import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.transactional.TransactionAttempt;
 import backtype.storm.transactional.partitioned.IOpaquePartitionedTransactionalSpout;
 import backtype.storm.tuple.Fields;
+import kafka.javaapi.consumer.SimpleConsumer;
+import org.apache.log4j.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import kafka.javaapi.consumer.SimpleConsumer;
-import org.apache.log4j.Logger;
+import java.util.UUID;
 
 
 public class OpaqueTransactionalKafkaSpout implements IOpaquePartitionedTransactionalSpout<BatchMeta> {
@@ -19,6 +21,7 @@ public class OpaqueTransactionalKafkaSpout implements IOpaquePartitionedTransact
     public static final String ATTEMPT_FIELD = OpaqueTransactionalKafkaSpout.class.getCanonicalName() + "/attempt";
 
     KafkaConfig _config;
+    private final String _topologyInstanceId = UUID.randomUUID().toString();
     
     public OpaqueTransactionalKafkaSpout(KafkaConfig config) {
         _config = config;
@@ -71,7 +74,7 @@ public class OpaqueTransactionalKafkaSpout implements IOpaquePartitionedTransact
         public BatchMeta emitPartitionBatch(TransactionAttempt attempt, BatchOutputCollector collector, int partition, BatchMeta lastMeta) {
             try {
                 SimpleConsumer consumer = _connections.getConsumer(partition);
-                return KafkaUtils.emitPartitionBatchNew(_config, partition, consumer, attempt, collector, lastMeta);
+                return KafkaUtils.emitPartitionBatchNew(_config, partition, consumer, attempt, collector, lastMeta, _topologyInstanceId);
             } catch(FailedFetchException e) {
                 LOG.warn("Failed to fetch from partition " + partition);
                 if(lastMeta==null) {

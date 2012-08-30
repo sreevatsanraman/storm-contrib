@@ -15,11 +15,24 @@ import kafka.message.MessageAndOffset;
 public class KafkaUtils {
     
     
-     public static BatchMeta emitPartitionBatchNew(KafkaConfig config, int partition, SimpleConsumer consumer, TransactionAttempt attempt, BatchOutputCollector collector, BatchMeta lastMeta) {
-         long offset = 0;
-         if(lastMeta!=null) {
+     public static BatchMeta emitPartitionBatchNew(
+             KafkaConfig config,
+             int partition,
+             SimpleConsumer consumer,
+             TransactionAttempt attempt,
+             BatchOutputCollector collector,
+             BatchMeta lastMeta,
+             String topologyInstanceId
+     ) {
+         long offset;
+         if (lastMeta == null) {
+             offset = getOffsetBefore(consumer, config, partition, -1);
+         } else if (config.forceFromStart && !topologyInstanceId.equals(lastMeta.instanceId)) {
+             offset = getOffsetBefore(consumer, config, partition, config.startOffsetTime);
+         } else {
              offset = lastMeta.nextOffset;
          }
+
          ByteBufferMessageSet msgs;
          try {
             msgs = consumer.fetch(new FetchRequest(config.topic, partition % config.partitionsPerHost, offset, config.fetchSizeBytes));
@@ -38,6 +51,7 @@ public class KafkaUtils {
          BatchMeta newMeta = new BatchMeta();
          newMeta.offset = offset;
          newMeta.nextOffset = endoffset;
+         newMeta.instanceId = topologyInstanceId;
          return newMeta;
      }
      
@@ -47,5 +61,9 @@ public class KafkaUtils {
          toEmit.add(attempt);
          toEmit.addAll(values);
          collector.emit(toEmit);           
+     }
+
+     private static long getOffsetBefore(SimpleConsumer consumer, KafkaConfig config, int partition, long time) {
+         return consumer.getOffsetsBefore(config.topic, partition % config.partitionsPerHost, time, 1)[0];
      }
 }

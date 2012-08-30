@@ -10,6 +10,8 @@ import backtype.storm.tuple.Fields;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+
 import kafka.api.FetchRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
@@ -20,6 +22,7 @@ public class TransactionalKafkaSpout extends BasePartitionedTransactionalSpout<B
     public static final String ATTEMPT_FIELD = TransactionalKafkaSpout.class.getCanonicalName() + "/attempt";
     
     KafkaConfig _config;
+    private final String _topologyInstanceId = UUID.randomUUID().toString();
     
     public TransactionalKafkaSpout(KafkaConfig config) {
         _config = config;
@@ -53,23 +56,25 @@ public class TransactionalKafkaSpout extends BasePartitionedTransactionalSpout<B
         public BatchMeta emitPartitionBatchNew(TransactionAttempt attempt, BatchOutputCollector collector, int partition, BatchMeta lastMeta) {
             SimpleConsumer consumer = _connections.getConsumer(partition);
 
-            return KafkaUtils.emitPartitionBatchNew(_config, partition, consumer, attempt, collector, lastMeta);
+            return KafkaUtils.emitPartitionBatchNew(_config, partition, consumer, attempt, collector, lastMeta, _topologyInstanceId);
         }
 
         @Override
         public void emitPartitionBatch(TransactionAttempt attempt, BatchOutputCollector collector, int partition, BatchMeta meta) {
-            SimpleConsumer consumer = _connections.getConsumer(partition);
-                        
-            ByteBufferMessageSet msgs = consumer.fetch(new FetchRequest(_config.topic, partition % _config.partitionsPerHost, meta.offset, _config.fetchSizeBytes));
-            long offset = meta.offset;
-            for(MessageAndOffset msg: msgs) {
-                if(offset == meta.nextOffset) break;
-                if(offset > meta.nextOffset) {
-                    throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
+            if (!_config.forceFromStart || meta.instanceId.equals(_topologyInstanceId)) {
+                SimpleConsumer consumer = _connections.getConsumer(partition);
+
+                ByteBufferMessageSet msgs = consumer.fetch(new FetchRequest(_config.topic, partition % _config.partitionsPerHost, meta.offset, _config.fetchSizeBytes));
+                long offset = meta.offset;
+                for(MessageAndOffset msg: msgs) {
+                    if(offset == meta.nextOffset) break;
+                    if(offset > meta.nextOffset) {
+                        throw new RuntimeException("Error when re-emitting batch. overshot the end offset");
+                    }
+                    KafkaUtils.emit(_config, attempt, collector, msg.message());
+                    offset = msg.offset();
                 }
-                KafkaUtils.emit(_config, attempt, collector, msg.message());
-                offset = msg.offset();
-            }            
+            }
         }
         
         @Override
