@@ -26,7 +26,8 @@ public class KafkaUtils {
      ) {
          long offset;
          if (lastMeta == null) {
-             offset = getOffsetBefore(consumer, config, partition, -1);
+             long startTime = config.forceFromStart ? config.startOffsetTime : -1;
+             offset = getOffsetBefore(consumer, config, partition, startTime);
          } else if (config.forceFromStart && !topologyInstanceId.equals(lastMeta.instanceId)) {
              offset = getOffsetBefore(consumer, config, partition, config.startOffsetTime);
          } else {
