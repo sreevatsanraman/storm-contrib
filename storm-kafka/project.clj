@@ -2,7 +2,7 @@
   :source-path "src/clj"
   :java-source-path "src/jvm"
   :javac-options {:debug "true" :fork "true"}
-  :repositories {"klout-snapshots" "http://maven-repo:8081/artifactory/libs-snapshot-local"
+  :repositories {"klout-snapshots" "http://maven-repo:8081/artifactory/ext-snapshot-local"
   		 "releases" "http://artifactory.local.twitter.com/libs-releases-local"
                  "snapshots" "http://artifactory.local.twitter.com/libs-snapshots-local"
                  "artifactory" "http://artifactory.local.twitter.com/repo"}
